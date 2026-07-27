@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Inventaris Sekolah
 
-## Getting Started
+Aplikasi web manajemen inventaris barang sekolah berbasis **event sourcing**.  
+Dibangun dengan Next.js 16 (App Router), SQLite, dan Tailwind CSS.
 
-First, run the development server:
+## Fitur
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Manajemen Master Data** — CRUD barang dan lokasi/ruangan
+- **Stok Awal** — Input stok awal barang di suatu lokasi dengan kondisi
+- **Transfer Barang** — Pindahkan stok antar lokasi, riwayat otomatis tercatat
+- **Perubahan Kondisi** — Ubah kondisi barang (Rusak Ringan / Rusak Berat / Diputihkan / Hilang)
+- **Log Perbaikan** — Catat perbaikan barang; status "Selesai" otomatis mengembalikan kondisi ke Baik
+- **Dashboard** — Ringkasan stok saat ini per barang per kondisi
+- **Timeline per Barang** — Riwayat kronologis semua kejadian (masuk, pindah, rusak, perbaikan, dll)
+- **Laporan Historis** — Bandingkan kondisi inventaris di tanggal tertentu vs sekarang, dengan sorotan perubahan
+
+## Arsitektur
+
+Data stok tidak disimpan sebagai angka final — **semua perubahan adalah event**.
+
+```
+flow:
+  User Action → stock_events (tabel) → replay → current state
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fungsi inti di `lib/events.ts`:
+- `recordEvent(event)` — insert baris kejadian
+- `getCurrentState(asOfDate?)` — replay semua event sampai tanggal tertentu
+- `getStateComparison(pastDate)` — side-by-side masa lalu vs sekarang + daftar perubahan
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Teknologi | Keterangan |
+|-----------|------------|
+| Next.js 16 | App Router, Server Components, Turbopack |
+| sql.js | SQLite WASM (tanpa native compilation) |
+| Tailwind CSS 4 | Utility-first styling |
+| react-icons | Icons |
+| xlsx | Seed dari file Excel |
 
-## Learn More
+## Persiapan
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Menjalankan
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev        # Development server (Turbopack)
+npm run build      # Production build
+npm run start      # Production server
+npx eslint .       # Linting (next lint dihapus di v16)
+```
 
-## Deploy on Vercel
+Database otomatis dibuat di `data/inventory.db` saat pertama kali diakses.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Seed Data
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tempatkan file `data.xlsx` di root proyek dengan sheet **Inventaris Lab Komputer**:
+
+| No | Nama Barang | Jumlah | Baik | Rusak | Keterangan Tambahan | Anggaran |
+|----|-------------|--------|------|-------|---------------------|----------|
+
+Tanpa file Excel, aplikasi menggunakan data demo bawaan.
+
+## Struktur Proyek
+
+```
+├── app/
+│   ├── api/            # REST API routes
+│   ├── items/          # CRUD + detail/timeline
+│   ├── locations/      # CRUD lokasi
+│   ├── transfer/       # Form transfer
+│   ├── condition/      # Form kondisi/write-off
+│   ├── maintenance/    # Log perbaikan
+│   ├── reports/history # Laporan point-in-time
+│   ├── layout.tsx      # Layout + navigasi
+│   └── page.tsx        # Dashboard
+├── lib/
+│   ├── db.ts           # Koneksi SQLite + migrasi
+│   ├── events.ts       # Event engine (jantung sistem)
+│   ├── seed.ts         # Seed data (Excel → DB)
+│   └── types.ts        # Shared TypeScript types
+├── data/               # Database file (gitignored)
+└── data.xlsx           # Source data (optional)
+```
+
+## Catatan Next.js 16
+
+- `params` dan `searchParams` adalah **Promise** — harus di-`await`
+- Turbopack adalah bundler default
+- `next lint` command dihapus, gunakan ESLint langsung
+- `sql.js` dan `xlsx` tercantum di `serverExternalPackages` di `next.config.ts`
+
+## Lisensi
+
+Hanya untuk penggunaan internal sekolah.
